@@ -87,7 +87,7 @@ class BluetoothAccessoryPickerViewController: UIViewController {
     let options: [String: Any] = [:]
     statusLabel.text = "Attempting to show Bluetooth picker..."
     let name = "YourAccessoryName"  // Replace with your accessory name
-    var nameFilter: NSPredicate? = NSPredicate(format: "name CONTAINS %@", name)
+    var nameFilter: NSPredicate? = NSPredicate(format: "name CONTAINS[c] %@", name)
     nameFilter = nil  // Comment this line to filter by name
     DispatchQueue.main.async {
       EAAccessoryManager.shared().showBluetoothAccessoryPicker(withNameFilter: nameFilter) {

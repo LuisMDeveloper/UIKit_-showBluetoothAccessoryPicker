@@ -46,6 +46,7 @@ class BluetoothAccessoryPickerViewController: UIViewController {
       .publisher(for: .EAAccessoryDidConnect, object: nil)
       .sink { notification in
         guard let accessory = notification.userInfo?[EAAccessoryKey] as? EAAccessory else { return }
+        //ToDo: call EAAccessory Connection_BluetoothEA.setupConnectionForAccessory
         print("Accessory connected: \(accessory.name)")
       }
       .store(in: &cancellables)

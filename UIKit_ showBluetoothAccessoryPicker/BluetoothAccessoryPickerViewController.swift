@@ -1,4 +1,5 @@
 import Combine
+import DatamaxONeilSDK
 import ExternalAccessory
 import UIKit
 
@@ -12,6 +13,9 @@ class BluetoothAccessoryPickerViewController: UIViewController {
     label.text = "Bluetooth Accessory Picker Demo"
     return label
   }()
+
+  //Connection_BluetoothEA connection
+  var connection: Connection_BluetoothEA?
 
   private let selectAccessoryButton: UIButton = {
     let button = UIButton(type: .system)
@@ -39,15 +43,32 @@ class BluetoothAccessoryPickerViewController: UIViewController {
     super.viewDidLoad()
     view.backgroundColor = .white
     setupUI()
+    // load our data from a plist file inside our app bundle
+    // objective-c code: NSArray *supportedProtocols = [[NSArray alloc] initWithArray:[[NSBundle mainBundle] objectForInfoDictionaryKey:@"UISupportedExternalAccessoryProtocols"]];
+    let supportedProtocols =
+      Bundle.main.object(forInfoDictionaryKey: "UISupportedExternalAccessoryProtocols") as? [String]
+      ?? []
 
     EAAccessoryManager.shared().registerForLocalNotifications()
+    if connection == nil {
+      connection = Connection_BluetoothEA(delegate: self)
+    }
 
     NotificationCenter.default
       .publisher(for: .EAAccessoryDidConnect, object: nil)
-      .sink { notification in
+      .sink { [weak self] notification in
+        guard let self = self else { return }
         guard let accessory = notification.userInfo?[EAAccessoryKey] as? EAAccessory else { return }
-        //ToDo: call EAAccessory Connection_BluetoothEA.setupConnectionForAccessory
-        print("Accessory connected: \(accessory.name)")
+        print("Connecting to accessory: \(accessory.name)")
+        //setup connection for selected bluetooth printer
+        if accessory.isConnected {
+          print("Accessory is already connected by the BluetoothAccessoryPicker")
+        }
+        print("Supported protocols: \(supportedProtocols)")
+        self.connection?.setupConnection(for: accessory, withProtocolString: supportedProtocols[0])
+        //Set timeout to 5 seconds
+        self.connection?.connTimeout = 5
+        self.connection?.open()
       }
       .store(in: &cancellables)
 
@@ -129,27 +150,17 @@ class BluetoothAccessoryPickerViewController: UIViewController {
   }
 }
 
-#if canImport(SwiftUI) && DEBUG
-  import SwiftUI
-  struct BluetoothAccessoryPickerViewController_Previews: PreviewProvider {
-    static var previews: some View {
-      UIViewControllerPreview {
-        BluetoothAccessoryPickerViewController()
-      }
-    }
+extension BluetoothAccessoryPickerViewController: ConnectionDelegate {
+  func connectionDidOpen(_ connection: Any!) {
+    print("Connection did open")
   }
 
-  struct UIViewControllerPreview<ViewController: UIViewController>: UIViewControllerRepresentable {
-    let viewController: ViewController
-
-    init(_ builder: @escaping () -> ViewController) {
-      viewController = builder()
-    }
-
-    func makeUIViewController(context: Context) -> ViewController {
-      return viewController
-    }
-
-    func updateUIViewController(_ uiViewController: ViewController, context: Context) {}
+  func connectionFailed(_ connection: Any!, withError error: (any Error)!) {
+    print("Connection failed")
   }
-#endif
+
+  func connectionDidClosed(_ connection: Any!) {
+    print("Connection did close")
+  }
+
+}

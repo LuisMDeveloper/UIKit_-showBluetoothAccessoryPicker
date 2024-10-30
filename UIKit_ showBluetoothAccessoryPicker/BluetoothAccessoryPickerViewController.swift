@@ -31,11 +31,11 @@ class BluetoothAccessoryPickerViewController: UIViewController {
   private let listAccessoriesButton: UIButton = {
     let button = UIButton(type: .system)
     button.translatesAutoresizingMaskIntoConstraints = false
-    button.setTitle("List Available Accessories", for: .normal)
+    button.setTitle("Print DPL", for: .normal)
     button.setTitleColor(.white, for: .normal)
     button.backgroundColor = .orange
     button.layer.cornerRadius = 10
-    button.addTarget(self, action: #selector(listAvailableAccessories), for: .touchUpInside)
+    button.addTarget(self, action: #selector(printSample), for: .touchUpInside)
     return button
   }()
 
@@ -68,7 +68,6 @@ class BluetoothAccessoryPickerViewController: UIViewController {
         self.connection?.setupConnection(for: accessory, withProtocolString: supportedProtocols[0])
         //Set timeout to 5 seconds
         self.connection?.connTimeout = 5
-        self.connection?.open()
       }
       .store(in: &cancellables)
 
@@ -108,8 +107,8 @@ class BluetoothAccessoryPickerViewController: UIViewController {
   @objc private func showBluetoothAccessoryPicker() {
     let options: [String: Any] = [:]
     statusLabel.text = "Attempting to show Bluetooth picker..."
-    let name = "YourAccessoryName"  // Replace with your accessory name
-    var nameFilter: NSPredicate? = NSPredicate(format: "name CONTAINS[c] %@", name)
+    let name = "Printer"  // Replace with your accessory name
+    var nameFilter: NSPredicate? = NSPredicate(format: "SELF CONTAINS[c] %@", name)
     nameFilter = nil  // Comment this line to filter by name
     DispatchQueue.main.async {
       EAAccessoryManager.shared().showBluetoothAccessoryPicker(withNameFilter: nameFilter) {
@@ -137,22 +136,48 @@ class BluetoothAccessoryPickerViewController: UIViewController {
     }
   }
 
-  @objc private func listAvailableAccessories() {
-    let accessories = EAAccessoryManager.shared().connectedAccessories
-    print("connectedAccessories")
-    if accessories.isEmpty {
-      statusLabel.text = "No accessories found."
-    } else {
-      let accessoryNames = accessories.map { $0.name }.joined(separator: ", ")
-      statusLabel.text = "Found accessories: \(accessoryNames)"
-      print("Connected accessories: \(accessoryNames)")
+  func performPrintOperation() {
+    if connection == nil {
+      print("Printer is not connected")
+      return
     }
+    // Create a new DPL document
+    let documentDPL = DocumentDPL()
+
+    // Configure the DPL document
+    documentDPL.writeTextScalable("Hello, World!", withFontID: "00", atRow: 5, atColumn: 5)
+
+    // Get the data from the DPL document
+    guard let data = documentDPL.getData() else {
+      print("Error getting data from DPL document")
+      return
+    }
+
+    let dataLength = data.count
+    var printData = [UInt8](repeating: 0, count: dataLength)
+    data.copyBytes(to: &printData, count: dataLength)
+
+    // Send the DPL document to the printer
+    printData.withUnsafeMutableBytes { (pointer: UnsafeMutableRawBufferPointer) in
+      let unsafePointer = pointer.bindMemory(to: UInt8.self).baseAddress
+      print("DPL document sent to the printer")
+      connection?.writeBytes(unsafePointer, count: dataLength)
+      connection?.close()
+    }
+  }
+
+  @objc private func printSample() {
+    self.connection?.open()
+
   }
 }
 
 extension BluetoothAccessoryPickerViewController: ConnectionDelegate {
   func connectionDidOpen(_ connection: Any!) {
     print("Connection did open")
+    DispatchQueue.global(qos: .default).async {
+      self.performPrintOperation()
+    }
   }
 
   func connectionFailed(_ connection: Any!, withError error: (any Error)!) {
